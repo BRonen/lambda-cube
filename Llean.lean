@@ -1,3 +1,2 @@
--- This module serves as the root of the `Llean` library.
--- Import modules here that should be built as part of the library.
-import «Llean».Lc
+import Llean.Lc
+import Llean.Stlc
