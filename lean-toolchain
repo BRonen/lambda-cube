@@ -1,0 +1,4 @@
+leanprover/lean4:4.9.0
+
+require std from git
+  "https://github.com/leanprover-community/batteries/" @ "main"
