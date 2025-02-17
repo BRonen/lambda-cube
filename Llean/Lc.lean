@@ -56,23 +56,23 @@ instance : ToString Value where
   toString (v : Value) : String := valueToString (size v) v
 
 def eval' (fuel : Nat) (ctx : List Value) (expr : Expr) : Except String Value :=
-  match fuel with
-   | 0 => Except.error "Fuel not enough"
-   | fuel' + 1 =>
-     match expr with
-      | val v => Except.ok (value v)
-      | var i =>
-        match ctx.get? i with
-         | some v => Except.ok v
-         | none => Except.error s!"Variable not found: {i} inside {expr}"
-      | abs body => Except.ok (closure ctx body)
-      | app f arg =>
-        match eval' fuel' ctx arg with
-         | Except.ok arg' =>
-           match eval' fuel' (ctx.cons arg') f with
-            | Except.ok (closure ctx body) => eval' fuel' ctx body
-            | other => other
-         | other => other
+  if fuel = 0 then
+    Except.error "Fuel not enough"
+  else
+    let fuel' := fuel - 1
+    match expr with
+     | val v => Except.ok (value v)
+     | var i =>
+       match ctx.get? i with
+        | some v => Except.ok v
+        | none => Except.error s!"Variable not found: {i} inside {expr}"
+     | abs body => Except.ok (closure ctx body)
+     | app f arg => do
+       let arg' <- eval' fuel' ctx arg
+       let f' <- eval' fuel' (ctx.cons arg') f
+       match f' with
+        | closure ctx body => eval' fuel' ctx body
+        | other => pure other
 
 def fuelNeeded : Expr → Nat
   | Expr.val _ => 1
