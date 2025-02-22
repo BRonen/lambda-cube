@@ -56,7 +56,7 @@ instance : ToString Te where
       match t with
       | Te.int n   => s!"Nat({n})"
       | Te.str s   => s!"String({s})"
-      | Te.abs t b => s!"(λ {toString t}. {ts b}"
+      | Te.abs t b => s!"(λ {toString t}. {ts b})"
       | Te.all b   => s!"(∀. {ts b})"
       | Te.var v   => s!"Var({v})"
       | Te.app f a => s!"({ts f} {ts a})"
@@ -134,14 +134,34 @@ instance : ToString Expr where
       | Expr.all b  => s!"(∀. {ts b})"
     ts e
 
-def evaluate (ctx : List Te) (term : Te) : Except String Te :=
+partial def evaluate (ctx : List Te) (term : Te) : Except String Te :=
   match term with
-  | Te.int _   => pure term
-  | Te.str _   => pure term
-  | Te.abs _ b => sorry
-  | Te.all b   => evaluate ctx b
-  | Te.var v   => sorry
-  | Te.app f a => sorry
-  | Te.apt t a => sorry
+  | Te.int n   => pure (Te.int n)
+  | Te.str s   => pure (Te.str s)
+  | Te.abs t b => pure (Te.abs t b)
+  | Te.all b   => pure (Te.all b)
+  | Te.var v   =>
+    match ctx.get? v with
+    | some t => pure t
+    | none   => Except.error s!"Trying to access not defined variable: {term}"
+  | Te.app f a => do
+    let f' ← evaluate ctx f
+    let a' ← evaluate ctx a
+    match f' with
+    | Te.abs _ body => evaluate (ctx.cons a') body
+    | _ => Except.error s!"Cannot apply non-function value: {f'}"
+  | Te.apt f t => do
+    let f' ← evaluate ctx f
+    match f' with
+    | Te.all body => evaluate ctx body
+    | _ => Except.error s!"Cannot apply a type ({t}) on a non-forall ({f}) value: {term}"
+
+#eval evaluate List.nil (Te.app (Te.abs Ty.str (Te.int 2)) (Te.str "hello"))
+#eval evaluate List.nil (Te.apt (Te.all (Te.int 0)) Ty.int)
+#eval evaluate List.nil (Te.apt (Te.abs Ty.int (Te.int 42)) Ty.int)
+#eval evaluate List.nil (Te.app (Te.abs Ty.int (Te.int 42)) (Te.str "hello world"))
+#eval evaluate List.nil (Te.abs (Ty.abs Ty.str Ty.int) (Te.app (Te.var 0) (Te.str "hello world")))
+#eval evaluate List.nil (Te.app (Te.abs (Ty.abs Ty.str Ty.int) (Te.app (Te.var 0) (Te.str "hello world"))) (Te.abs Ty.int (Te.int 42)))
+#eval evaluate List.nil (Te.app (Te.abs (Ty.abs Ty.str Ty.int) (Te.app (Te.var 0) (Te.str "hello world"))) (Te.abs Ty.str (Te.int 42)))
 
 end Llean.sf
