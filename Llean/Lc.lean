@@ -32,33 +32,23 @@ inductive Value where
 open Value
 
 mutual
-  def listSize (l : List Value) : Nat :=
-    match l with
-     | [] => 0
-     | v :: vs => size v + listSize vs
+  -- Removed listSize and size as they were primarily used for fuel calculation
+  -- and are not strictly necessary for structural recursion in toString.
 
-  def size (v : Value) : Nat :=
+  def valueToString (v : Value) : String :=
     match v with
-     | value _ => 1
-     | closure ctx _ => 1 + listSize ctx
+     | value v => s!"{v}"
+     | closure ctx body =>
+        let ctx := ctx.map valueToString
+        s!"(τ {ctx} : {body})"
 end
 
-def valueToString (fuel : Nat) (v : Value) : String :=
-  match fuel, v with
-   | 0, _ => ""
-   | _, value v => s!"{v}"
-   | fuel' + 1, closure ctx body =>
-      let ctx := ctx.map (valueToString fuel')
-      s!"(τ {ctx} : {body})"
-
 instance : ToString Value where
-  toString (v : Value) : String := valueToString (size v) v
+  toString : Value → String := valueToString
 
-def eval' (fuel : Nat) (ctx : List Value) (expr : Expr) : Except String Value :=
-  if fuel = 0 then
-    Except.error "Fuel not enough"
-  else
-    let fuel' := fuel - 1
+-- Renamed eval' to eval and removed fuel parameter
+mutual
+  partial def eval (ctx : List Value) (expr : Expr) : Except String Value :=
     match expr with
      | val v => Except.ok $ value v
      | var i =>
@@ -67,21 +57,13 @@ def eval' (fuel : Nat) (ctx : List Value) (expr : Expr) : Except String Value :=
         | none => Except.error s!"Variable not found: {i} inside {expr}"
      | abs body => Except.ok $ closure ctx body
      | app f arg => do
-       let arg' ← eval' fuel' ctx arg
-       match ← eval' fuel' ctx f with
-        | closure ctx' body => eval' fuel' (ctx'.cons arg') body
+       let arg' ← eval ctx arg
+       match ← eval ctx f with
+        | closure ctx' body => eval (ctx'.cons arg') body
         | _ => Except.error s!"Trying to apply a non-closure value: {expr}"
+end
 
-def fuelNeeded : Expr → Nat
-  | Expr.val _ => 1
-  | Expr.var _ => 1
-  | Expr.abs body => 1 + fuelNeeded body
-  | Expr.app f arg => 1 + fuelNeeded f + fuelNeeded arg
-
-#eval fuelNeeded (app (abs (var 0)) (abs (app (var 0) (var 0))))
-#eval fuelNeeded (app (abs (app (abs (var 0)) (val 5))) (val 3))
-
-def eval ctx expr := eval' (fuelNeeded expr) ctx expr
+-- Removed fuelNeeded function
 
 #eval eval List.nil (app (abs (var 0)) (abs (app (var 0) (var 0))))
 #eval eval List.nil (app (abs (app (abs (var 0)) (val 5))) (val 3))
