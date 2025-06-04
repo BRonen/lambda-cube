@@ -60,16 +60,15 @@ mutual
      | closure ctx _ => 1 + listSize ctx
 end
 
-def valueToString (fuel : Nat) (v : Value) : String :=
-  match fuel, v with
-   | 0, _ => ""
-   | _, value v => s!"{v}"
-   | fuel' + 1, closure ctx body =>
-      let ctx := ctx.map (valueToString fuel')
-      s!"(τ {ctx} : {body})"
-
 instance : ToString Value where
-  toString (v : Value) : String := valueToString (size v) v
+  toString (v : Value) : String := 
+    let rec ts := λv =>
+      match v with
+      | value v => s!"{v}"
+      | closure ctx body =>
+        let ctx := ctx.map ts
+        s!"(τ {ctx} : {body})"
+    ts v
 
 def check' (fuel : Nat) (ctx : List TExpr) (expr : Expr) : Except String TExpr :=
   if fuel = 0 then
