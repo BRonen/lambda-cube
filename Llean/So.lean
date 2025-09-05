@@ -1,167 +1,191 @@
 namespace Llean.so
 
--- typesystem values
-inductive Ty where
-  | int : Ty
-  | str : Ty
-  | abs : Ty → Ty → Ty
-  | all : Ty → Ty
-  | var : Nat → Ty
+-- kinds
+
+inductive K where
+| star : K
+| kind : K → K
 deriving DecidableEq
 
-def measureTy t :=
-  match t with
-  | Ty.int     => 1
-  | Ty.str     => 1
-  | Ty.abs a r => 1 + measureTy a + measureTy r
-  | Ty.all r   => 1 + measureTy r
-  | Ty.var _   => 1
+open K
 
-instance : ToString Ty where
-  toString t :=
-    let rec f := λ t =>
-      match t with
-      | Ty.int     => "Int"
-      | Ty.str     => "Str"
-      | Ty.abs a r => s!"(λ{f a}. {f r})"
-      | Ty.all r   => s!"(∀. {f r})"
-      | Ty.var v   => s!"Var({v})"
-    f t
+def sizeK
+| star   => 1
+| kind k => 1 + sizeK k
 
-#eval (Ty.all (Ty.abs Ty.int Ty.str))
+instance : ToString K where
+  toString :=
+    let rec f
+    | star => "Star"
+    | kind k => s!"Kind[{f k}]"
+    f
 
--- system terms
-inductive Te where
-  | int : Int → Te
-  | str : String → Te
-  | abs : Ty → Te → Te
-  | all : Te → Te
-  | var : Nat → Te
-  | app : Te → Te → Te
-  | apt : Te → Ty → Te
+#eval star
+#eval kind (kind (kind star))
 
-def measureTe t :=
-  match t with
-  | Te.int _   => 1
-  | Te.str _   => 1
-  | Te.abs t b => 1 + measureTy t + measureTe b
-  | Te.all b   => 1 + measureTe b
-  | Te.var _   => 1
-  | Te.app f a => 1 + measureTe f + measureTe a
-  | Te.apt t y => 1 + measureTe t + measureTy y
+-- types
 
-instance : ToString Te where
-  toString t :=
-    let rec ts := λ t =>
-      match t with
-      | Te.int n   => s!"Nat({n})"
-      | Te.str s   => s!"String({s})"
-      | Te.abs t b => s!"(λ {toString t}. {ts b})"
-      | Te.all b   => s!"(∀. {ts b})"
-      | Te.var v   => s!"Var({v})"
-      | Te.app f a => s!"({ts f} {ts a})"
-      | Te.apt t y => s!"[{ts t} {toString y}]"
-    ts t
+inductive T where
+| tint    : T
+| tstr    : T
+| tvar    : Nat → T
+| tapp    : T → T → T
+| tarrow  : T → T → T
+| tforall : K → T → T
+deriving DecidableEq
 
-#eval (Te.all (Te.abs Ty.int (Te.str "hello world")))
+open T
 
-def check (ctx : List Ty) (term : Te) : Except String Ty :=
+def sizeT
+| tint        => 1
+| tstr        => 1
+| tvar _      => 1
+| tapp b p    => 1 + sizeK b + sizeT p
+| tarrow a b  => 1 + sizeT a + sizeT b
+| tforall k r => 1 + sizeK k + sizeT r
+
+instance : ToString T where
+  toString :=
+    let rec f
+    | tint        => "Int"
+    | tstr        => "Str"
+    | tvar v      => s!"Var({v})"
+    | tapp b p    => s!"({f b}. {f p})"
+    | tarrow a b  => s!"(λ{f a}. {f b})"
+    | tforall k r => s!"(∀{k}. {f r})"
+    f
+
+#eval tint
+#eval (tforall star (tarrow tint tstr))
+#eval (tforall (kind star) (tarrow tint tstr))
+
+-- terms
+
+inductive E where
+| eint    : Int → E
+| estr    : String → E
+| evar    : Nat → E
+| eapp    : E → E → E
+| eapt    : E → T → E
+| eabs    : T → E → E
+| eforall : K → E → E
+
+open E
+
+def sizeE
+| eint _      => 1
+| estr _      => 1
+| evar _      => 1
+| eapp b a    => 1 + sizeE b + sizeE a
+| eapt b t    => 1 + sizeE b + sizeT t
+| eabs p b    => 1 + sizeT p + sizeE b
+| eforall t b => 1 + sizeK t + sizeE b
+
+instance : ToString E where
+  toString :=
+    let rec ts
+    | eint    n   => s!"Int({n})"
+    | estr    s   => s!"String({s})"
+    | evar    v   => s!"Var({v})"
+    | eapp    f a => s!"({ts f} {ts a})"
+    | eapt    t y => s!"[{ts t} {y}]"
+    | eabs    t b => s!"(λ {t}. {ts b})"
+    | eforall k b => s!"(∀ {k}. {ts b})"
+    ts
+
+#eval (eforall star (eabs tint (estr "hello world")))
+#eval (eforall (kind star) (eabs tint (estr "hello world")))
+
+-- checkers
+
+def kindcheck (Δ : List K) (type : T) : Except String K :=
+  match type with
+  | tint => pure star
+  | tstr => pure star
+  | tvar v => do
+    match Δ.get? v with
+    | some k => pure k
+    | none => Except.error s!"Unbound type variable {v}"
+  | tapp b p => do
+    let b ← kindcheck Δ b
+    let p ← kindcheck Δ p
+    match b with
+    | kind b =>
+      if p = b
+      then pure star
+      else Except.error s!"Invalid application: {type}"
+    | star => Except.error s!"Cannot apply callee: {type}"
+  | tarrow t b => do
+    let t ← kindcheck Δ t
+    let b ← kindcheck Δ b
+    match (t, b) with
+    | (star, star) => pure star
+    | (_, _) => Except.error s!"Wrong definition of arrow type: {t} → {b}"
+  | tforall k b => do
+    let b ← kindcheck (k :: Δ) b
+    if b = star
+    then pure star
+    else Except.error s!"Wrong definition of forall type: {b} must be star"
+
+def substT (term : T) (i : Nat) (v : T) : T :=
   match term with
-  | Te.int _   => pure Ty.int
-  | Te.str _   => pure Ty.str
-  | Te.abs t b => do
-    let t ← match t with
-            | Ty.var v => match ctx.get? v with
-                          | some t => pure t
-                          | none => Except.error s!"Trying to access not defined variable: {term}"
-            | other    => pure other
-    let b ←  check (ctx.cons t) b
-    pure $ Ty.abs t b
-  | Te.all b   => do
-    let t ← check ctx b
-    pure $ Ty.all t
-  | Te.var v   =>
-    match ctx.get? v with
+  | tvar j =>
+    if j = i
+    then v
+    else tvar j
+  | tarrow a b =>
+    let a := substT a i v
+    let b := substT b i v
+    tarrow a b
+  | tapp b p =>
+    let b := substT b i v
+    let p := substT p i v
+    tapp b p
+  | tforall k b =>
+    let b := substT b (i + 1) v
+    tforall k b
+  | t => t
+
+def check (Γ : List T) (Δ : List K) (term : E) : Except String T :=
+  match term with
+  | eint _ => pure tint
+  | estr _ => pure tstr
+  | evar v =>
+    match Γ.get? v with
     | some v => pure v
-    | none   => Except.error s!"Trying to access not defined variable: {term}"
-  | Te.app f a => do
-    let a ← check ctx a
-    let f' ← check ctx f
-    match f' with
-    | Ty.abs t b =>
+    | none   => Except.error s!"Trying to access not defined variable: {v}"
+  | eabs t b => do
+    let b ← check (t :: Γ) Δ b
+    pure $ tarrow t b
+  | eforall k b => do
+    let b ← check Γ (k :: Δ) b
+    pure $ tforall k b
+  | eapp f a => do
+    let a ← check Γ Δ a
+    let f ← check Γ Δ f
+    match f with
+    | tarrow t b =>
       if t = a
       then pure b
       else Except.error s!"Expected to apply {t} but received {a}"
-    | Ty.var v => do
-      match ctx.get? v with
-      | some (Ty.abs t r) =>
-        if t = a
-        then pure r
-        else Except.error s!"Expected to apply {t} but received {a}"
-      | some t => Except.error s!"Trying to apply value {a} on a term of type {t}"
-      | none   => Except.error s!"Trying to access not defined variable: {term}"
-    | _        => Except.error s!"Trying to apply value {a} on a term of type {f}"
-  | Te.apt f a => do
-    let f' ← check (ctx.cons a) f
-    match f' with
-    | Ty.all b => pure b
-    | Ty.var v => do
-      match ctx.get? v with
-      | some (Ty.all r) => pure r
-      | some t => Except.error s!"Trying to apply type {a} on a term of type {t}"
-      | none   => Except.error s!"Trying to access not defined variable: {term}"
-    | _        => Except.error s!"Trying to apply value {a} on a term of type {f}"
+    | _ => Except.error s!"Trying to apply value {a} on a term of type {f}"
+  | eapt f a => do
+    let a' ← kindcheck Δ a
+    let f ← check Γ Δ f
+    match f with
+    | tforall k b =>
+      if a' = k
+      then pure (substT b 0 a)
+      else Except.error s!"Trying to apply type {a} of {k} on a term of kind {f}"
+    | _ => Except.error s!"Trying to apply value {a} on a term of type {f}"
 
-#eval check List.nil (Te.app (Te.abs Ty.str (Te.int 2)) (Te.str "hello world"))
-#eval check List.nil (Te.all (Te.abs (Ty.var 0) (Te.int 1)))
-#eval check List.nil (Te.apt (Te.all (Te.abs (Ty.var 0) (Te.int 1))) Ty.int)
-#eval check List.nil (Te.app (Te.apt (Te.all (Te.abs (Ty.var 0) (Te.var 2))) Ty.int) (Te.int 3))
+#eval check [] [] (eapp (eabs tstr (eint 2)) (estr "hello world"))
+#eval check [] [] (eforall star (eabs (tvar 0) (evar 0)))
+#eval check [] [] (eforall star (eabs (tvar 1) (evar 1)))
+#eval check [] [] (eforall star (eabs (tvar 0) (evar 1)))
+#eval check [] [] (eapt (eforall star (eabs (tvar 0) (evar 0))) tint)
+#eval check [] [] (eapp (eapt (eforall star (eabs (tvar 0) (evar 0))) tint) (eint 3))
+#eval check [] [] (eapp (eabs tint (eint 0)) (eapp (eapt (eforall star (eabs (tvar 0) (evar 0))) tint) (eint 0)))
+#eval check [] [] (eapp (eabs tstr (eint 0)) (eapp (eapt (eforall star (eabs (tvar 0) (evar 0))) tint) (eint 0)))
 
--- runtime values
-inductive Expr where
-  | clsr : Expr → Expr
-  | int  : Int → Expr
-  | str  : String → Expr
-  | all  : Expr → Expr
-
-instance : ToString Expr where
-  toString e :=
-    let rec ts := λ e =>
-      match e with
-      | Expr.int n  => s!"Int({n})"
-      | Expr.str s  => s!"String({s})"
-      | Expr.clsr b => s!"(λ. {ts b})"
-      | Expr.all b  => s!"(∀. {ts b})"
-    ts e
-
-partial def evaluate (ctx : List Te) (term : Te) : Except String Te :=
-  match term with
-  | Te.int n   => pure (Te.int n)
-  | Te.str s   => pure (Te.str s)
-  | Te.abs t b => pure (Te.abs t b)
-  | Te.all b   => pure (Te.all b)
-  | Te.var v   =>
-    match ctx.get? v with
-    | some t => pure t
-    | none   => Except.error s!"Trying to access not defined variable: {term}"
-  | Te.app f a => do
-    let f' ← evaluate ctx f
-    let a' ← evaluate ctx a
-    match f' with
-    | Te.abs _ body => evaluate (ctx.cons a') body
-    | _ => Except.error s!"Cannot apply non-function value: {f'}"
-  | Te.apt f t => do
-    let f' ← evaluate ctx f
-    match f' with
-    | Te.all body => evaluate ctx body
-    | _ => Except.error s!"Cannot apply a type ({t}) on a non-forall ({f}) value: {term}"
-
-#eval evaluate List.nil (Te.app (Te.abs Ty.str (Te.int 2)) (Te.str "hello"))
-#eval evaluate List.nil (Te.apt (Te.all (Te.int 0)) Ty.int)
-#eval evaluate List.nil (Te.apt (Te.abs Ty.int (Te.int 42)) Ty.int)
-#eval evaluate List.nil (Te.app (Te.abs Ty.int (Te.int 42)) (Te.str "hello world"))
-#eval evaluate List.nil (Te.abs (Ty.abs Ty.str Ty.int) (Te.app (Te.var 0) (Te.str "hello world")))
-#eval evaluate List.nil (Te.app (Te.abs (Ty.abs Ty.str Ty.int) (Te.app (Te.var 0) (Te.str "hello world"))) (Te.abs Ty.int (Te.int 42)))
-#eval evaluate List.nil (Te.app (Te.abs (Ty.abs Ty.str Ty.int) (Te.app (Te.var 0) (Te.str "hello world"))) (Te.abs Ty.str (Te.int 42)))
-
-end Llean.sf
+end Llean.so
