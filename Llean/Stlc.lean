@@ -7,13 +7,13 @@ deriving DecidableEq
 
 open TExpr
 
-def texprToString (t : TExpr) := 
-  match t with
-   | abst c => s!"(∀ {texprToString c})"
-   | intt => s!"ℕ"
-
 instance : ToString TExpr where
-  toString : TExpr → String := texprToString
+  toString :=
+    let rec f := λt =>
+      match t with
+      | abst c => s!"(∀ {f c})"
+      | intt => s!"ℕ"
+    f
 
 inductive Expr where
   | abs : TExpr → Expr → Expr
@@ -23,20 +23,20 @@ inductive Expr where
 
 open Expr
 
-def exprToString (e : Expr) : String :=
-  match e with
-   | val v => s!"{v}"
-   | var v => s!"{v}!"
-   | abs t body =>
-      let body : String := exprToString body
-      s!"(λ {t}. {body})"
-   | app f arg =>
-      let arg : String := exprToString arg
-      let f : String := exprToString f
-      s!"({f} {arg})"
+def size : Expr → Nat
+  | Expr.val _ => 1
+  | Expr.var _ => 1
+  | Expr.abs _ body => 1 + size body
+  | Expr.app f arg => 1 + size f + size arg
 
 instance : ToString Expr where
-  toString : Expr → String := exprToString
+  toString :=
+    let rec f
+    | val v => s!"{v}"
+    | var v => s!"{v}!"
+    | abs t body => s!"(λ {t}. {f body})"
+    | app ap arg => s!"({f ap} {f arg})"
+    f
 
 def test := app (abs (abst intt) (var 0)) (abs intt (var 0))
 #eval test
@@ -48,27 +48,16 @@ inductive Value where
 
 open Value
 
-mutual
-  def listSize (l : List Value) : Nat :=
-    match l with
-     | [] => 0
-     | v :: vs => size v + listSize vs
-
-  def size (v : Value) : Nat :=
-    match v with
-     | value _ => 1
-     | closure ctx _ => 1 + listSize ctx
-end
-
 instance : ToString Value where
-  toString (v : Value) : String := 
-    let rec ts := λv =>
+  toString :=
+    let rec f := λv =>
+      let rec fs
+      | v :: vs => f v ++ fs vs
+      | [] => ""
       match v with
       | value v => s!"{v}"
-      | closure ctx body =>
-        let ctx := ctx.map ts
-        s!"(τ {ctx} : {body})"
-    ts v
+      | closure ctx body => s!"(τ {fs ctx} : {body})"
+    f
 
 def check' (fuel : Nat) (ctx : List TExpr) (expr : Expr) : Except String TExpr :=
   if fuel = 0 then
@@ -120,17 +109,11 @@ def eval' (fuel : Nat) (ctx : List Value) (expr : Expr) : Except String Value :=
         | closure ctx' body => eval' fuel' (ctx'.cons arg') body
         | _ => Except.error s!"Trying to apply a non-closure value: {expr}"
 
-def fuelNeeded : Expr → Nat
-  | Expr.val _ => 1
-  | Expr.var _ => 1
-  | Expr.abs _ body => 1 + fuelNeeded body
-  | Expr.app f arg => 1 + fuelNeeded f + fuelNeeded arg
+#eval size (app (abs intt (var 0)) (abs intt (app (var 0) (var 0))))
+#eval size (app (abs intt (app (abs intt (var 0)) (val 5))) (val 3))
 
-#eval fuelNeeded (app (abs intt (var 0)) (abs intt (app (var 0) (var 0))))
-#eval fuelNeeded (app (abs intt (app (abs intt (var 0)) (val 5))) (val 3))
-
-def check ctx expr := check' (fuelNeeded expr) ctx expr
-def eval ctx expr := eval' (fuelNeeded expr) ctx expr
+def check ctx expr := check' (size expr) ctx expr
+def eval ctx expr := eval' (size expr) ctx expr
 
 #eval check List.nil
       (abs intt (var 0))
