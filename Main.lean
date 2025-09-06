@@ -1,5 +1,5 @@
 def double (f : Nat -> Nat) n := f (f n)
-def inc := fun n => n + 1
+def inc n := n + 1
 
 def main : IO Unit :=
   IO.println s!"Hello, {double inc 100}"

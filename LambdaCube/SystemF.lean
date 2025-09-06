@@ -1,4 +1,4 @@
-namespace Llean.sf
+namespace LambdaCube.SystemF
 
 -- typesystem values
 inductive Ty where
@@ -164,4 +164,4 @@ partial def evaluate (ctx : List Te) (term : Te) : Except String Te :=
 #eval evaluate List.nil (Te.app (Te.abs (Ty.abs Ty.str Ty.int) (Te.app (Te.var 0) (Te.str "hello world"))) (Te.abs Ty.int (Te.int 42)))
 #eval evaluate List.nil (Te.app (Te.abs (Ty.abs Ty.str Ty.int) (Te.app (Te.var 0) (Te.str "hello world"))) (Te.abs Ty.str (Te.int 42)))
 
-end Llean.sf
+end LambdaCube.SystemF

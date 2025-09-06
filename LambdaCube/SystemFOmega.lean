@@ -1,4 +1,4 @@
-namespace Llean.so
+namespace LambdaCube.SystemFOmega
 
 -- kinds
 
@@ -188,4 +188,4 @@ def check (Γ : List T) (Δ : List K) (term : E) : Except String T :=
 #eval check [] [] (eapp (eabs tint (eint 0)) (eapp (eapt (eforall star (eabs (tvar 0) (evar 0))) tint) (eint 0)))
 #eval check [] [] (eapp (eabs tstr (eint 0)) (eapp (eapt (eforall star (eabs (tvar 0) (evar 0))) tint) (eint 0)))
 
-end Llean.so
+end LambdaCube.SystemFOmega

@@ -1,4 +1,4 @@
-namespace Llean.Lc
+namespace LambdaCube.LambdaCalculus
 
 inductive Expr where
   | abs : Expr → Expr
@@ -54,4 +54,4 @@ partial def eval (ctx : List Value) : Expr → Except String Value
 #eval eval List.nil (app (abs (var 0)) (abs (app (var 0) (var 0))))
 #eval eval List.nil (app (abs (app (abs (var 0)) (val 5))) (val 3))
 
-end Llean.Lc
+end LambdaCube.LambdaCalculus

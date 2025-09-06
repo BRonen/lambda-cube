@@ -1,4 +1,4 @@
-namespace Llean.Stlc
+namespace LambdaCube.SimpleTyped
 
 inductive TExpr where
   | abst : TExpr → TExpr
@@ -127,4 +127,4 @@ def eval ctx expr := eval' (size expr) ctx expr
 #eval eval List.nil (app (abs (abst (abst intt)) (var 0)) (abs intt (app (var 0) (val 1))))
 #eval eval List.nil (app (abs intt (app (abs intt (var 0)) (val 5))) (val 3))
 
-end Llean.Stlc
+end LambdaCube.SimpleTyped
