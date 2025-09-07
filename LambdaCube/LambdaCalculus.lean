@@ -17,9 +17,7 @@ instance : ToString Expr where
     | app ap arg => s!"({f ap} {f arg})"
     f
 
-def test := app (abs (var 0)) (abs (var 0))
-#eval test
-#eval ((List.cons 1 List.nil).cons 2).drop 1
+#eval app (abs (var 0)) (abs (var 0))
 
 inductive Value where
   | value : Nat → Value
@@ -48,10 +46,10 @@ partial def eval (ctx : List Value) : Expr → Except String Value
 | app f arg => do
   let arg' ← eval ctx arg
   match ← eval ctx f with
-   | closure ctx' body => eval (ctx'.cons arg') body
+   | closure ctx' body => eval (arg' :: ctx') body
    | e => Except.error s!"Trying to apply a non-closure value: {e}"
 
-#eval eval List.nil (app (abs (var 0)) (abs (app (var 0) (var 0))))
-#eval eval List.nil (app (abs (app (abs (var 0)) (val 5))) (val 3))
+#eval eval [] (app (abs (var 0)) (abs (app (var 0) (var 0))))
+#eval eval [] (app (abs (app (abs (var 0)) (val 5))) (val 3))
 
 end LambdaCube.LambdaCalculus

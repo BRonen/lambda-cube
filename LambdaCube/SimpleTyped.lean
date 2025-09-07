@@ -1,33 +1,32 @@
 namespace LambdaCube.SimpleTyped
 
 inductive TExpr where
-  | abst : TExpr → TExpr
-  | intt : TExpr
+| abst : TExpr → TExpr
+| intt : TExpr
 deriving DecidableEq
 
 open TExpr
 
 instance : ToString TExpr where
   toString :=
-    let rec f := λt =>
-      match t with
-      | abst c => s!"(∀ {f c})"
-      | intt => s!"ℕ"
+    let rec f
+    | abst c => s!"(∀ {f c})"
+    | intt => s!"ℕ"
     f
 
 inductive Expr where
-  | abs : TExpr → Expr → Expr
-  | app : Expr → Expr → Expr
-  | var : Nat → Expr
-  | val : Nat → Expr
+| abs : TExpr → Expr → Expr
+| app : Expr → Expr → Expr
+| var : Nat → Expr
+| val : Nat → Expr
 
 open Expr
 
 def size : Expr → Nat
-  | Expr.val _ => 1
-  | Expr.var _ => 1
-  | Expr.abs _ body => 1 + size body
-  | Expr.app f arg => 1 + size f + size arg
+| val _      => 1
+| var _      => 1
+| abs _ body => 1 + size body
+| app f arg  => 1 + size f + size arg
 
 instance : ToString Expr where
   toString :=
@@ -38,13 +37,11 @@ instance : ToString Expr where
     | app ap arg => s!"({f ap} {f arg})"
     f
 
-def test := app (abs (abst intt) (var 0)) (abs intt (var 0))
-#eval test
-#eval ((List.cons 1 List.nil).cons 2).drop 1
+#eval app (abs (abst intt) (var 0)) (abs intt (var 0))
 
 inductive Value where
-  | value : Nat → Value
-  | closure : List Value → Expr → Value
+| value : Nat → Value
+| closure : List Value → Expr → Value
 
 open Value
 
