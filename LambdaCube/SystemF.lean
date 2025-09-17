@@ -109,3 +109,5 @@ def check (Γ : List T) (term : E) : Except String T :=
 #eval check [] (eapp (eapt (eforall (earrow (tvar 0) (evar 0))) tint) (estr "3"))
 #eval check [] (eapp (earrow (tarrow tint tint) (eapp (evar 0) (eapp (evar 0) (eint 3)))) (earrow tint (eint 3)))
 #eval check [] (eapp (eapp (earrow tint (earrow (tarrow tint tint) (eapp (evar 0) (evar 1)))) (eint 3)) (earrow tint (evar 0)))
+
+end LambdaCube.SystemF
