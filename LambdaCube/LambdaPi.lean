@@ -51,7 +51,7 @@ def check (Γ : List T) (expr : E) : Except String T :=
   | int _ => Except.ok (base "int")
   | type _ => Except.ok sort
   | var i =>
-    match Γ.get? i with
+    match getElem? Γ i with
     | some t => pure t
     | none => Except.error s!"Variable not found: {i} inside {Γ}"
   | abs t body => do

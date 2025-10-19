@@ -103,7 +103,7 @@ def kindcheck (Δ : List K) (type : T) : Except String K :=
   | tint => pure star
   | tstr => pure star
   | tvar v => do
-    match Δ.get? v with
+    match getElem? Δ v with
     | some k => pure k
     | none => Except.error s!"Unbound type variable {v}"
   | tapp b p => do
@@ -151,7 +151,7 @@ def check (Γ : List T) (Δ : List K) (term : E) : Except String T :=
   | eint _ => pure tint
   | estr _ => pure tstr
   | evar v =>
-    match Γ.get? v with
+    match getElem? Γ v with
     | some v => pure v
     | none   => Except.error s!"Trying to access not defined variable: {v}"
   | eabs t b => do

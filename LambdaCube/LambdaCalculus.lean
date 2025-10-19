@@ -39,7 +39,7 @@ instance : ToString Value where
 partial def eval (ctx : List Value) : Expr → Except String Value
 | val v => Except.ok $ value v
 | var i =>
-  match ctx.get? i with
+  match getElem? ctx i with
    | some v => Except.ok v
    | none => Except.error s!"Variable not found: {i}"
 | abs body => Except.ok $ closure ctx body

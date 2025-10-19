@@ -82,7 +82,7 @@ def check (Γ : List T) (term : E) : Except String T :=
   | eforall b => do
     pure $ tforall (← check Γ b)
   | evar v =>
-    match Γ.get? v with
+    match getElem? Γ v with
     | some v => pure v
     | none   => Except.error s!"Trying to access not defined variable: {term}"
   | eapp f a => do

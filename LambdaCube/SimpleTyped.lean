@@ -64,7 +64,7 @@ def check' (fuel : Nat) (ctx : List TExpr) (expr : Expr) : Except String TExpr :
     match expr with
      | val _ => Except.ok intt
      | var i =>
-       match ctx.get? i with
+       match getElem? ctx i with
         | some t => pure t
         | none => Except.error s!"Variable not found: {i} inside {ctx}"
      | abs t body => do
@@ -79,7 +79,7 @@ def check' (fuel : Nat) (ctx : List TExpr) (expr : Expr) : Except String TExpr :
           else
             Except.error s!"Trying to apply {arg'} instead of {t}: {expr}"
         | var i =>
-          match ctx.get? i with
+          match getElem? ctx i with
            | none => Except.error s!"Variable not found: {i} inside {ctx}"
            | some t =>
              if t == abst arg' then
@@ -96,7 +96,7 @@ def eval' (fuel : Nat) (ctx : List Value) (expr : Expr) : Except String Value :=
     match expr with
      | val v => Except.ok $ value v
      | var i =>
-       match ctx.get? i with
+       match getElem? ctx i with
         | some v => Except.ok v
         | none => Except.error s!"Variable not found: {i} inside {ctx}"
      | abs _ body => Except.ok $ closure ctx body
