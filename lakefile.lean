@@ -10,5 +10,3 @@ lean_lib «LambdaCube» where
 @[default_target]
 lean_exe «lambdacube» where
   root := `Main
-
-require batteries from git "https://github.com/leanprover-community/batteries" @ "main"
