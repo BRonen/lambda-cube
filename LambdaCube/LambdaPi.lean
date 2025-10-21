@@ -63,7 +63,7 @@ def check (Γ : List E) (expr : E) : Except String E :=
     | sort _ =>
       let body' ← check (t :: Γ) body
       return pi t body'
-    | _ => Except.error "TODO"
+    | _ => Except.error "Abstraction first argument must be a Type"
   | app f arg => do
     match ← check Γ f with
     | pi t b =>
