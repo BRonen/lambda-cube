@@ -43,6 +43,21 @@ def subst (index : Nat) (e : E) : E → E
 | app ap arg => app (subst index e ap) (subst index e arg)
 | other => other
 
+def norm (e : E) (gas : Nat) : E :=
+  if gas = 0
+  then e
+  else match e with
+  | app (abs _ body) arg =>
+    let body := subst 0 arg body
+    norm body (gas - 1)
+  | app f arg => app (norm f gas) (norm arg gas)
+  | abs t b => abs (norm t gas) (norm b gas)
+  | pi t b => pi (norm t gas) (norm b gas)
+  | other => other
+
+def conv (a b : E) : Bool :=
+  norm a (size a) = norm b (size b)
+
 def check (Γ : List E) (expr : E) : Except String E :=
   match expr with
   | sort n => return sort (n + 1)
@@ -68,8 +83,9 @@ def check (Γ : List E) (expr : E) : Except String E :=
     match ← check Γ f with
     | pi t b =>
       let arg' ← check Γ arg
-      if t = arg'
-      then return (subst 0 arg b)
+      if conv t arg'
+      then let b := subst 0 arg b
+           return norm b (size b)
       else Except.error s!"Expected to apply {t} but received {arg'}"
     | f => Except.error s!"Trying to apply value {arg} on a term of type {f}"
 
@@ -116,5 +132,9 @@ def check (Γ : List E) (expr : E) : Except String E :=
 -- (λ *. (λ (Π Var<0>. Var<0>). Var<0>))(Int :: *)(λ (Int :: *). Var<0>)(3) -> Int :: *
 #eval (app (app (app (abs (sort 0) (abs (pi (var 0) (var 0)) (var 0))) (const "int")) (abs (const "int") (var 0))) (lit 3))
 #eval check [] (app (app (app (abs (sort 0) (abs (pi (var 0) (var 0)) (var 0))) (const "int")) (abs (const "int") (var 0))) (lit 3))
+
+-- (λ (λ *. Var<0>)(Int :: *). Var<0>)(42)
+#eval (app (abs (app (abs (sort 0) (var 0)) (const "int")) (var 0)) (lit 42))
+#eval check [] (app (abs (app (abs (sort 0) (var 0)) (const "int")) (var 0)) (lit 42))
 
 end LambdaCube.LambdaPi
